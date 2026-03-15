@@ -401,7 +401,9 @@ async function sendMessage() {
     if (!response.ok) {
       const errText = await response.text();
       console.error('API error:', response.status, errText);
-      const errMsg = `Sorry, something went wrong (status ${response.status}). Please try again or reach me at **nandikasoni9@gmail.com**.`;
+      let errDetail = '';
+      try { errDetail = JSON.parse(errText)?.error?.message || errText; } catch(e) { errDetail = errText; }
+      const errMsg = `API error (${response.status}): ${errDetail}`;
       addMessage('bot', fmt(errMsg), errMsg);
       isStreaming = false;
       document.getElementById('sendBtn').disabled = false;
