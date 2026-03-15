@@ -32,6 +32,11 @@ export default async function handler(req) {
 
   try {
     const body = await req.text();
+    const parsed = JSON.parse(body);
+
+    // Extract user message for logging
+    const messages = parsed.messages || [];
+    const userMessage = [...messages].reverse().find(m => m.role === 'user')?.content || '';
 
     const upstream = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -41,8 +46,6 @@ export default async function handler(req) {
       },
       body: body,
     });
-
-    const contentType = upstream.headers.get('content-type') || 'application/json';
 
     if (!upstream.ok) {
       const errBody = await upstream.text();
@@ -56,10 +59,48 @@ export default async function handler(req) {
       });
     }
 
-    return new Response(upstream.body, {
-      status: upstream.status,
+    // Read the full response so we can log it, then stream it back
+    const responseText = await upstream.text();
+
+    // Extract bot response text from the streamed chunks
+    let botResponse = '';
+    const lines = responseText.split('\n');
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6);
+      if (data === '[DONE]') break;
+      try {
+        const chunk = JSON.parse(data);
+        const delta = chunk.choices?.[0]?.delta?.content;
+        if (delta) botResponse += delta;
+      } catch (e) {}
+    }
+
+    // Log to Supabase (fire and forget — don't block the response)
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_KEY;
+    if (supabaseUrl && supabaseKey && userMessage) {
+      fetch(`${supabaseUrl}/rest/v1/conversations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({
+          user_message: userMessage,
+          bot_response: botResponse,
+          user_agent: req.headers.get('user-agent') || '',
+        }),
+      }).catch(err => console.error('Supabase log error:', err));
+    }
+
+    // Stream the original response back to the client
+    return new Response(responseText, {
+      status: 200,
       headers: {
-        'Content-Type': contentType,
+        'Content-Type': 'text/event-stream',
         'Access-Control-Allow-Origin': '*',
       },
     });
@@ -74,4 +115,3 @@ export default async function handler(req) {
     });
   }
 }
-
