@@ -387,7 +387,7 @@ async function sendMessage() {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-5',
         max_tokens: 1000,
         stream: true,
         system: SYSTEM_PROMPT,
@@ -396,6 +396,18 @@ async function sendMessage() {
     });
 
     removeTyping();
+
+    // Check if the response itself failed
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('API error:', response.status, errText);
+      const errMsg = `Sorry, something went wrong (status ${response.status}). Please try again or reach me at **nandikasoni9@gmail.com**.`;
+      addMessage('bot', fmt(errMsg), errMsg);
+      isStreaming = false;
+      document.getElementById('sendBtn').disabled = false;
+      return;
+    }
+
     let fullText = '';
     const bubble = addMessage('bot', '<span class="streaming-cursor"></span>', '');
 
@@ -424,6 +436,11 @@ async function sendMessage() {
       }
     }
 
+    // If we got nothing back, show a fallback
+    if (!fullText) {
+      fullText = "I didn't get a response — please try again or reach me at **nandikasoni9@gmail.com**.";
+    }
+
     bubble.innerHTML = fmt(fullText);
     const copyBtn = bubble.closest('.message')?.querySelector('.copy-btn');
     if (copyBtn) copyBtn.onclick = () => { navigator.clipboard.writeText(fullText); showToast('Copied!'); };
@@ -433,6 +450,7 @@ async function sendMessage() {
 
   } catch(err) {
     removeTyping();
+    console.error('Fetch error:', err);
     const fallback = "Something went wrong — feel free to reach me at **nandikasoni9@gmail.com** or on [LinkedIn](https://www.linkedin.com/in/nandika-soni-771610220).";
     addMessage('bot', fmt(fallback), fallback);
   }
