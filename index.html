@@ -387,11 +387,13 @@ async function sendMessage() {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'llama-3.3-70b-versatile',
         max_tokens: 1000,
         stream: true,
-        system: SYSTEM_PROMPT,
-        messages: conversationHistory
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          ...conversationHistory
+        ]
       })
     });
 
@@ -429,8 +431,9 @@ async function sendMessage() {
         if (data === '[DONE]') break;
         try {
           const parsed = JSON.parse(data);
-          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-            fullText += parsed.delta.text;
+          const delta = parsed.choices?.[0]?.delta?.content;
+          if (delta) {
+            fullText += delta;
             bubble.innerHTML = fmt(fullText) + '<span class="streaming-cursor"></span>';
             document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
           }
