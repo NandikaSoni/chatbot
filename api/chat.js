@@ -22,7 +22,7 @@ export default async function handler(req) {
     });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'API key not configured' }), {
       status: 500,
@@ -33,22 +33,20 @@ export default async function handler(req) {
   try {
     const body = await req.text();
 
-    const upstream = await fetch('https://api.anthropic.com/v1/messages', {
+    const upstream = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: body,
     });
 
     const contentType = upstream.headers.get('content-type') || 'application/json';
 
-    // If error, read and return the body so we can debug
     if (!upstream.ok) {
       const errBody = await upstream.text();
-      console.error('Anthropic error:', upstream.status, errBody);
+      console.error('Groq error:', upstream.status, errBody);
       return new Response(errBody, {
         status: upstream.status,
         headers: {
@@ -76,3 +74,4 @@ export default async function handler(req) {
     });
   }
 }
+
